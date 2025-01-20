@@ -190,7 +190,7 @@ class DeSoDexClient:
         url = f"{self.node_url}{route_path}"
 
         payload = {
-            "Transactions": unsigned_transaction_hexes
+            "UnsignedTransactionHexes": unsigned_transaction_hexes
         }
 
         headers = {
@@ -292,6 +292,22 @@ class DeSoDexClient:
 
             time.sleep(0.1)  # Sleep for 100 milliseconds before retrying
 
+    def coins_to_base_units(self, coin_amount: float, is_deso: bool, hex_encode: bool = False) -> str:
+        if is_deso:
+            base_units = int(coin_amount * 1e9)
+        else:
+            base_units = int(coin_amount * 1e18)
+        if hex_encode:
+            return hex(base_units)
+        return str(base_units)
+
+    def base_units_to_coins(self, coin_base_units: str | int, is_deso: bool) -> float:
+        # Decode hex if needed
+        if str(coin_base_units).startswith("0x"):
+            coin_base_units = int(coin_base_units, 16)
+        if is_deso:
+            return float(coin_base_units) / 1e9
+        return float(coin_base_units) / 1e18
 
     def mint_or_burn_tokens(
         self,
@@ -783,7 +799,7 @@ def main():
     #
     # Replace the below with your seed phrase. If you have "passphrase" or a different
     # index you can specify it below as well.
-    SEED_PHRASE_OR_HEX = "trip pear deliver parade where dentist left enact round ladder harbor arrange"
+    SEED_PHRASE_OR_HEX = ""
     PASSPHRASE = ""
     INDEX = 0
     # Testnet public key: tBCKV1NauX3S59wFxcZrWujDNeu2FufVhjK4PMVGAtBhJnU9wioaBU
@@ -794,7 +810,7 @@ def main():
     openfund_link = "dev.openfund.com" if IS_TESTNET else "openfund.com"
     focus_link = "beta.focus.xyz" if IS_TESTNET else "focus.xyz"
     error_msg_SET_SEED = (f"ERROR: You must set SEED_PHRASE_OR_HEX to a seed that has DESO in it, or else nothing will "
-                          f"work. Use {NODE_URL} since IS_TESTNET={IS_TESTNET}. Change IS_TESTNET to switch "
+                          f"work. Use {NODE_URL} to create an account and get starter DESO since IS_TESTNET={IS_TESTNET}. Change IS_TESTNET to switch "
                           f"between mainnet and testnet. See the top of main for other arguments. Read through main to see "
                           f"a bunch of useful transaction types. Other useful links: "
                           f"docs.deso.org {explorer_link}, {wallet_link}, {openfund_link}, {focus_link}. "
@@ -822,15 +838,20 @@ def main():
     try:
         balances = client.get_token_balances(
             user_public_key=string_pubkey,
-            creator_public_keys=[openfund_pubkey, "DESO"],
+            creator_public_keys=[openfund_pubkey, "DESO", string_pubkey],
         )
-        pprint(balances)
+        # pprint(balances)
     except Exception as e:
         print(f"ERROR: Get token balances call failed: {e}")
 
-    if balances['Balances']['DESO']['BalanceBaseUnits'] == '0':
+    deso_balance_nanos = int(balances['Balances']['DESO']['BalanceBaseUnits'])
+    if deso_balance_nanos == 0:
         print(error_msg_SET_SEED)
         sys.exit(1)
+
+    openfund_balance_base_units = int(balances['Balances'][openfund_pubkey]['BalanceBaseUnits'])
+    print(f'DESO balance: {deso_balance_nanos} nanos (1e9 = 1 coin) = {client.base_units_to_coins(deso_balance_nanos, is_deso=True)} coins')
+    print(f'OPENFUND balance: {openfund_balance_base_units} base units (1e18 = 1 coin) = {client.base_units_to_coins(openfund_balance_base_units, is_deso=False)} tokens')
 
     try:
         single_profile = client.get_single_profile(
@@ -848,6 +869,19 @@ def main():
     except Exception as e:
         print(f"ERROR: Get profile failed: {e}")
 
+    def print_balances():
+        balances = client.get_token_balances(
+            user_public_key=string_pubkey,
+            creator_public_keys=[openfund_pubkey, "DESO", string_pubkey],
+        )
+        print('Balances: ', balances)
+        deso_balance_nanos = int(balances['Balances']['DESO']['BalanceBaseUnits'])
+        openfund_balance_base_units = int(balances['Balances'][openfund_pubkey]['BalanceBaseUnits'])
+        print(f'DESO balance: {deso_balance_nanos} nanos (1e9 = 1 coin) = {client.base_units_to_coins(deso_balance_nanos, is_deso=True)} coins')
+        print(f'OPENFUND balance: {openfund_balance_base_units} base units (1e18 = 1 coin) = {client.base_units_to_coins(openfund_balance_base_units, is_deso=False)} tokens')
+        your_token_balance_base_units = int(balances['Balances'][string_pubkey]['BalanceBaseUnits'])
+        print(f'${single_profile['Username']} balance: {your_token_balance_base_units} base units (1e18 = 1 coin) = {client.base_units_to_coins(your_token_balance_base_units, is_deso=False)} tokens')
+
     print("\n---- Transfer DESO ----")
     try:
         pprint('Constructing txn...')
@@ -863,29 +897,38 @@ def main():
         txn_hash = submitted_txn_response['TxnHashHex']
         print(f'Waiting for commitment... Hash = {txn_hash}. Find on {explorer_link}/txn/{txn_hash}. Sometimes it takes a minute to show up on the block explorer.')
         client.wait_for_commitment_with_timeout(txn_hash, 30.0)
-        pprint('SUCCESS!')
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Transfer tokens call failed: {e}")
 
     print("---- Mint Tokens (sign & submit - requires profile) ----")
     try:
+        print_balances()
+        coins_to_mint = client.coins_to_base_units(1.0, is_deso=False, hex_encode=True)
         mint_response = client.mint_or_burn_tokens(
             updater_pubkey_base58check=string_pubkey,
             profile_pubkey_base58check=string_pubkey, # Since you are minting your own token
             operation_type="mint",
-            coins_to_mint_or_burn_nanos="0xde0b6b3a7640000",
+            coins_to_mint_or_burn_nanos=coins_to_mint,
         )
         submitted_txn_response = client.sign_and_submit_txn(mint_response)
         txn_hash = submitted_txn_response['TxnHashHex']
         print(f'Waiting for commitment... Hash = {txn_hash}. Find on {explorer_link}/txn/{txn_hash}. Sometimes it takes a minute to show up on the block explorer.')
         client.wait_for_commitment_with_timeout(txn_hash, 30.0)
-        pprint('SUCCESS!')
+        print_balances()
+        print('SUCCESS!')
 
     except Exception as e:
         print(f"ERROR: Mint tokens call failed: {e}")
 
     print("\n---- Atomic txn example (sign and submit - requires profile) ----")
     try:
+        # Print the balance
+        balances = client.get_token_balances(
+            user_public_key=string_pubkey,
+            creator_public_keys=[string_pubkey],
+        )
+        print('Balance before two mints: ', balances)
         mint_response_01 = client.mint_or_burn_tokens(
             updater_pubkey_base58check=string_pubkey,
             profile_pubkey_base58check=string_pubkey, # Since you are minting your own token
@@ -904,7 +947,12 @@ def main():
         txn_hash = submitted_txn_response['TxnHashHex']
         print(f'Waiting for commitment... Hash = {txn_hash}. Find on {explorer_link}/txn/{txn_hash}. Sometimes it takes a minute to show up on the block explorer.')
         client.wait_for_commitment_with_timeout(txn_hash, 30.0)
-        pprint('SUCCESS!')
+        balances = client.get_token_balances(
+            user_public_key=string_pubkey,
+            creator_public_keys=[string_pubkey],
+        )
+        print('Balance after two mints: ', balances)
+        print('SUCCESS!')
 
     except Exception as e:
         print(f"ERROR: Atomic txn example failed: {e}")
@@ -918,6 +966,7 @@ def main():
             coins_to_mint_or_burn_nanos="0xde0b6b3a7640000",
         )
         pprint(burn_response)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Burn tokens call failed: {e}")
 
@@ -930,6 +979,7 @@ def main():
             token_to_transfer_base_units="0xde0b6b3a7640000",
         )
         pprint(transfer_response)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Transfer tokens call failed: {e}")
 
@@ -941,6 +991,7 @@ def main():
             transfer_restriction_status="profile_owner_only",
         )
         pprint(update_status_response)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Update restriction status call failed: {e}")
 
@@ -958,6 +1009,7 @@ def main():
             quantity_currency_type="base",
         )
         pprint(market_sell_response)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Market sell call failed: {e}")
 
@@ -975,6 +1027,7 @@ def main():
             fill_type="GOOD_TILL_CANCELLED",
         )
         pprint(limit_buy_response)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Limit buy call failed: {e}")
 
@@ -992,6 +1045,7 @@ def main():
             fill_type="GOOD_TILL_CANCELLED",
         )
         pprint(limit_sell_response)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Limit sell call failed: {e}")
 
@@ -1002,6 +1056,7 @@ def main():
             cancel_order_id="b3996cee436b5ddcea11b65047ddc26c5fdb6b34a947fd1d3a43c4212045b3ef",  # Example
         )
         pprint(cancel_response)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Cancel order call failed; this will fail on mainnet but not testnet: {e}")
 
@@ -1013,6 +1068,7 @@ def main():
             coin2_creator_pubkey=openfund_pubkey,
         )
         pprint(market_orders_response_1)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Get open orders call 1 failed: {e}")
 
@@ -1023,6 +1079,7 @@ def main():
             coin2_creator_pubkey=DESO_TOKEN_PUBKEY,
         )
         pprint(market_orders_response_2)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Get open orders call 2 failed: {e}")
 
@@ -1032,6 +1089,7 @@ def main():
             transactor_pubkey_base58check=nader_pubkey
         )
         pprint(user_orders_response)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Get user open orders call failed: {e}")
 

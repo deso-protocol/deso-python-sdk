@@ -679,6 +679,119 @@ class DeSoDexClient:
             raise requests.exceptions.HTTPError(f"HTTP Error: {e}, Response: {error_json}")
         return resp.json()
 
+    def submit_post(
+            self,
+            updater_public_key_base58check: str,
+            body: str,
+            parent_post_hash_hex: Optional[str] = None,
+            reposted_post_hash_hex: Optional[str] = None,
+            title: Optional[str] = "",
+            image_urls: Optional[List[str]] = None,
+            video_urls: Optional[List[str]] = None,
+            post_extra_data: Optional[Dict[str, Any]] = None,
+            min_fee_rate_nanos_per_kb: int = 1000,
+            is_hidden: bool = False,
+            in_tutorial: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Submit a post or repost to the DeSo blockchain.
+
+        Args:
+            updater_public_key_base58check: Public key of the updater.
+            body: The content of the post.
+            parent_post_hash_hex: The hash of the parent post for replies.
+            reposted_post_hash_hex: The hash of the post being reposted.
+            title: An optional title for the post.
+            image_urls: Optional list of image URLs.
+            video_urls: Optional list of video URLs.
+            post_extra_data: Optional additional data for the post.
+            min_fee_rate_nanos_per_kb: Minimum fee rate in nanos per KB.
+            is_hidden: Boolean to indicate if the post is hidden.
+            in_tutorial: Boolean to indicate if the post is part of a tutorial.
+
+        Returns:
+            Dict[str, Any]: Response from the DeSo node.
+
+        Raises:
+            ValueError: If the request fails.
+        """
+        url = f"{self.node_url}/api/v0/submit-post"
+        payload = {
+            "UpdaterPublicKeyBase58Check": updater_public_key_base58check,
+            "PostHashHexToModify": "",
+            "ParentStakeID": parent_post_hash_hex or "",
+            "RepostedPostHashHex": reposted_post_hash_hex or "",
+            "Title": title or "",
+            "BodyObj": {
+                "Body": body,
+                "ImageURLs": image_urls or [],
+                "VideoURLs": video_urls or [],
+            },
+            "PostExtraData": post_extra_data or {"Node": "1"},
+            "Sub": "",
+            "IsHidden": is_hidden,
+            "MinFeeRateNanosPerKB": min_fee_rate_nanos_per_kb,
+            "InTutorial": in_tutorial,
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        response = requests.post(url, json=payload, headers=headers)
+
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            error_json = response.json() if response.content else response.text
+            raise ValueError(f"HTTP Error: {e}, Response: {error_json}")
+
+        return response.json()
+
+    def create_follow_transaction(
+            self,
+            follower_public_key_base58check: str,
+            followed_public_key_base58check: str,
+            is_unfollow: bool = False,
+            min_fee_rate_nanos_per_kb: int = 1000,
+    ) -> Dict[str, Any]:
+        """
+        Create a follow or unfollow transaction.
+
+        Args:
+            follower_public_key_base58check: Public key of the follower.
+            followed_public_key_base58check: Public key of the followed user.
+            is_unfollow: Whether to unfollow instead of follow.
+            min_fee_rate_nanos_per_kb: Minimum fee rate in nanos per KB.
+
+        Returns:
+            Dict[str, Any]: Response from the DeSo node.
+
+        Raises:
+            ValueError: If the request fails.
+        """
+        url = f"{self.node_url}/api/v0/create-follow-txn-stateless"
+        payload = {
+            "FollowerPublicKeyBase58Check": follower_public_key_base58check,
+            "FollowedPublicKeyBase58Check": followed_public_key_base58check,
+            "IsUnfollow": is_unfollow,
+            "MinFeeRateNanosPerKB": min_fee_rate_nanos_per_kb,
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        response = requests.post(url, json=payload, headers=headers)
+
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            error_json = response.json() if response.content else response.text
+            raise ValueError(f"HTTP Error: {e}, Response: {error_json}")
+
+        return response.json()
+
 class DeSoKeyPair:
     def __init__(self, public_key: bytes, private_key: bytes):
         self.public_key = public_key
@@ -789,8 +902,13 @@ def main():
     if not IS_TESTNET:
        NODE_URL = "https://node.deso.org"
 
+    # Print the params
+    print(f"IS_TESTNET={IS_TESTNET}, NODE_URL={NODE_URL}")
+
     # This pubkey is used for token-related things, such as buying or selling a token where
     # DESO is the quote currency. You can see how it's used in the txn construction endpoints below.
+    # To denote DESO as the currency you want to transact, you must use one of these pubkeys. They
+    # correspond to the ZERO pubkey (a pubkey that is all zeros encoded using base58check).
     DESO_TOKEN_PUBKEY = ('tBCKQud934akEwsr8AfG9BzHDWhi6CaDmjBsxGsSgfGsoxXHfVEfxP' if IS_TESTNET else
                          'BC1YLbnP7rndL92x7DbLp6bkUpCgKmgoHgz7xEbwhgHTps3ZrXA6LtQ')
 
@@ -802,15 +920,13 @@ def main():
     SEED_PHRASE_OR_HEX = ""
     PASSPHRASE = ""
     INDEX = 0
-    # Testnet public key: tBCKV1NauX3S59wFxcZrWujDNeu2FufVhjK4PMVGAtBhJnU9wioaBU
-    # Mainnet public key: BC1YLft8ZjF61yF1X43FQUKVQyLsdwPtZczF8fgZXAWNeMsWiicue9X
 
     explorer_link = "explorer-testnet.deso.com" if IS_TESTNET else "explorer.deso.com"
     wallet_link = "wallet-testnet.deso.com" if IS_TESTNET else "wallet.deso.com"
     openfund_link = "dev.openfund.com" if IS_TESTNET else "openfund.com"
     focus_link = "beta.focus.xyz" if IS_TESTNET else "focus.xyz"
     error_msg_SET_SEED = (f"ERROR: You must set SEED_PHRASE_OR_HEX to a seed that has DESO in it, or else nothing will "
-                          f"work. Use {NODE_URL} to create an account and get starter DESO since IS_TESTNET={IS_TESTNET}. Change IS_TESTNET to switch "
+                          f"work. Use {NODE_URL} or {openfund_link} to create an account and get starter DESO since IS_TESTNET={IS_TESTNET}. Change IS_TESTNET to switch "
                           f"between mainnet and testnet. See the top of main for other arguments. Read through main to see "
                           f"a bunch of useful transaction types. Other useful links: "
                           f"docs.deso.org {explorer_link}, {wallet_link}, {openfund_link}, {focus_link}. "
@@ -834,8 +950,9 @@ def main():
     nader_pubkey = ("tBCKWkMW7SNyA4kuAHLtvFgdPRDgqS3gPfH5UWoeGZbxftkzUqpiKF" if IS_TESTNET else
                     "BC1YLhyuDGeWVgHmh3UQEoKstda525T1LnonYWURBdpgWbFBfRuntP5")
 
-    print(f"Get $openfund and $DESO balances for pubkey: {string_pubkey}")
     try:
+        print(f"\n---- Get balances ----")
+        print(f'Getting $openfund and $DESO balances for pubkey: {string_pubkey}')
         balances = client.get_token_balances(
             user_public_key=string_pubkey,
             creator_public_keys=[openfund_pubkey, "DESO", string_pubkey],
@@ -851,9 +968,12 @@ def main():
 
     openfund_balance_base_units = int(balances['Balances'][openfund_pubkey]['BalanceBaseUnits'])
     print(f'DESO balance: {deso_balance_nanos} nanos (1e9 = 1 coin) = {client.base_units_to_coins(deso_balance_nanos, is_deso=True)} coins')
-    print(f'OPENFUND balance: {openfund_balance_base_units} base units (1e18 = 1 coin) = {client.base_units_to_coins(openfund_balance_base_units, is_deso=False)} tokens')
+    print(f'OPENFUND balance: {openfund_balance_base_units} base units (1e18 = 1 token) = {client.base_units_to_coins(openfund_balance_base_units, is_deso=False)} tokens')
+    print('SUCCESS!')
 
     try:
+        print(f"\n---- Get profile ----")
+        print(f'Checking profile for pubkey={string_pubkey}...')
         single_profile = client.get_single_profile(
             public_key_base58check=string_pubkey,
             username=None, # Use this if you want to fetch by username!
@@ -865,22 +985,67 @@ def main():
                   f"docs.deso.org {explorer_link}, {wallet_link}, {openfund_link}, {focus_link}. "
                   f"Message https://t.me/deso_pos_discussion for more help.")
             sys.exit(1)
-        pprint(single_profile)
+        # pprint(single_profile)
+        print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Get profile failed: {e}")
+
+    print("\n---- Submit Post ----")
+    try:
+        print('Constructing submit-post txn...')
+        post_response = client.submit_post(
+            updater_public_key_base58check=string_pubkey,
+            body="IT WORKED!",
+            parent_post_hash_hex="",  # Example parent post hash
+            title="",
+            image_urls=[],
+            video_urls=[],
+            post_extra_data={"Node": "1"},
+            min_fee_rate_nanos_per_kb=1000,
+            is_hidden=False,
+            in_tutorial=False
+        )
+        print('Signing and submitting txn...')
+        submitted_txn_response = client.sign_and_submit_txn(post_response)
+        txn_hash = submitted_txn_response['TxnHashHex']
+        print(f'Waiting for commitment... Hash = {txn_hash}. Find on {explorer_link}/txn/{txn_hash}. Sometimes it takes a minute to show up on the block explorer.')
+        client.wait_for_commitment_with_timeout(txn_hash, 30.0)
+        print('SUCCESS!')
+    except Exception as e:
+        print(f"ERROR: Submit post call failed: {e}")
+
+    print("\n---- Create Follow Transaction ----")
+    try:
+        print('Constructing follow transaction...')
+        follow_response = client.create_follow_transaction(
+            follower_public_key_base58check=string_pubkey,
+            followed_public_key_base58check=nader_pubkey,
+            is_unfollow=False,  # Set to True to unfollow
+            min_fee_rate_nanos_per_kb=1000,
+        )
+        # pprint(follow_response)
+        print('Follow transaction constructed successfully!')
+        print('Signing and submitting transaction...')
+        signed_response = client.sign_and_submit_txn(follow_response)
+        txn_hash = signed_response['TxnHashHex']
+        print(f'Waiting for commitment... Hash = {txn_hash}. Find on {explorer_link}/txn/{txn_hash}. Sometimes it takes a minute to show up on the block explorer.')
+        client.wait_for_commitment_with_timeout(txn_hash, 30.0)
+        print('SUCCESS!')
+    except Exception as e:
+        print(f"ERROR: Create follow transaction failed: {e}")
 
     def print_balances():
         balances = client.get_token_balances(
             user_public_key=string_pubkey,
             creator_public_keys=[openfund_pubkey, "DESO", string_pubkey],
         )
-        print('Balances: ', balances)
+        # print('Balances: ', balances)
         deso_balance_nanos = int(balances['Balances']['DESO']['BalanceBaseUnits'])
         openfund_balance_base_units = int(balances['Balances'][openfund_pubkey]['BalanceBaseUnits'])
         print(f'DESO balance: {deso_balance_nanos} nanos (1e9 = 1 coin) = {client.base_units_to_coins(deso_balance_nanos, is_deso=True)} coins')
-        print(f'OPENFUND balance: {openfund_balance_base_units} base units (1e18 = 1 coin) = {client.base_units_to_coins(openfund_balance_base_units, is_deso=False)} tokens')
+        print(f'OPENFUND balance: {openfund_balance_base_units} base units (1e18 = 1 token) = {client.base_units_to_coins(openfund_balance_base_units, is_deso=False)} tokens')
         your_token_balance_base_units = int(balances['Balances'][string_pubkey]['BalanceBaseUnits'])
-        print(f'${single_profile['Username']} balance: {your_token_balance_base_units} base units (1e18 = 1 coin) = {client.base_units_to_coins(your_token_balance_base_units, is_deso=False)} tokens')
+        print(f'${single_profile['Username']} balance: {your_token_balance_base_units} base units (1e18 = 1 token) = {client.base_units_to_coins(your_token_balance_base_units, is_deso=False)} tokens')
 
     print("\n---- Transfer DESO ----")
     try:
@@ -890,8 +1055,8 @@ def main():
             recipient_pubkey_or_username=nader_pubkey,
             amount_nanos=1,
         )
-        print('Txn constructed. Response is below. The txn construction response often has useful information in it:')
-        pprint(send_deso_response)
+        print('Txn constructed. The txn construction response often has useful information in it. Comment it in if you want to see it.')
+        # pprint(send_deso_response)
         print('Signing and submitting txn...')
         submitted_txn_response = client.sign_and_submit_txn(send_deso_response)
         txn_hash = submitted_txn_response['TxnHashHex']
@@ -901,9 +1066,11 @@ def main():
     except Exception as e:
         print(f"ERROR: Transfer tokens call failed: {e}")
 
-    print("---- Mint Tokens (sign & submit - requires profile) ----")
+    print("\n ---- Mint Tokens (sign & submit - requires profile) ----")
     try:
+        print('Balance before minting:')
         print_balances()
+        print('Constructing txn...')
         coins_to_mint = client.coins_to_base_units(1.0, is_deso=False, hex_encode=True)
         mint_response = client.mint_or_burn_tokens(
             updater_pubkey_base58check=string_pubkey,
@@ -911,10 +1078,14 @@ def main():
             operation_type="mint",
             coins_to_mint_or_burn_nanos=coins_to_mint,
         )
+        print('Txn constructed. The txn construction response often has useful information in it. Comment it in if you want to see it.')
+        # pprint(mint_response)
+        print('Signing and submitting txn...')
         submitted_txn_response = client.sign_and_submit_txn(mint_response)
         txn_hash = submitted_txn_response['TxnHashHex']
         print(f'Waiting for commitment... Hash = {txn_hash}. Find on {explorer_link}/txn/{txn_hash}. Sometimes it takes a minute to show up on the block explorer.')
         client.wait_for_commitment_with_timeout(txn_hash, 30.0)
+        print('Balance after minting:')
         print_balances()
         print('SUCCESS!')
 
@@ -924,11 +1095,8 @@ def main():
     print("\n---- Atomic txn example (sign and submit - requires profile) ----")
     try:
         # Print the balance
-        balances = client.get_token_balances(
-            user_public_key=string_pubkey,
-            creator_public_keys=[string_pubkey],
-        )
-        print('Balance before two mints: ', balances)
+        print('Balance before two mints: ')
+        print_balances()
         mint_response_01 = client.mint_or_burn_tokens(
             updater_pubkey_base58check=string_pubkey,
             profile_pubkey_base58check=string_pubkey, # Since you are minting your own token
@@ -947,11 +1115,8 @@ def main():
         txn_hash = submitted_txn_response['TxnHashHex']
         print(f'Waiting for commitment... Hash = {txn_hash}. Find on {explorer_link}/txn/{txn_hash}. Sometimes it takes a minute to show up on the block explorer.')
         client.wait_for_commitment_with_timeout(txn_hash, 30.0)
-        balances = client.get_token_balances(
-            user_public_key=string_pubkey,
-            creator_public_keys=[string_pubkey],
-        )
-        print('Balance after two mints: ', balances)
+        print('Balance after two mints: ')
+        print_balances()
         print('SUCCESS!')
 
     except Exception as e:
@@ -959,44 +1124,54 @@ def main():
 
     print("\n---- Burn Tokens (construction of txn only) ----")
     try:
+        print('Constructing txn...')
         burn_response = client.mint_or_burn_tokens(
             updater_pubkey_base58check=string_pubkey,
             profile_pubkey_base58check=string_pubkey, # Since you are burning your own token
             operation_type="burn",
             coins_to_mint_or_burn_nanos="0xde0b6b3a7640000",
         )
-        pprint(burn_response)
+        print('Txn constructed. The txn construction response often has useful information in it. Comment it in if you want to see it.')
+        # pprint(burn_response)
+        print('Not submitting txn because it will fail on mainnet. This is just an example of how to construct a burn txn.')
         print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Burn tokens call failed: {e}")
 
     print("\n---- Transfer Tokens (construction of txn only) ----")
     try:
+        print('Constructing txn...')
         transfer_response = client.transfer_tokens(
             sender_pubkey_base58check=string_pubkey,
             profile_pubkey_base58check=string_pubkey,
             receiver_pubkey_base58check=nader_pubkey,
             token_to_transfer_base_units="0xde0b6b3a7640000",
         )
-        pprint(transfer_response)
+        print('Txn constructed. The txn construction response often has useful information in it. Comment it in if you want to see it.')
+        # pprint(transfer_response)
+        print('Not submitting txn because it will fail on mainnet. This is just an example of how to construct a transfer txn.')
         print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Transfer tokens call failed: {e}")
 
     print("\n---- Update Transfer Restriction Status (example construction of txn only) ----")
     try:
+        print('Constructing txn...')
         update_status_response = client.update_transfer_restriction_status(
             updater_pubkey_base58check=string_pubkey,
             profile_pubkey_base58check=string_pubkey,
             transfer_restriction_status="profile_owner_only",
         )
-        pprint(update_status_response)
+        print('Txn constructed. The txn construction response often has useful information in it. Comment it in if you want to see it.')
+        # pprint(update_status_response)
+        print('Not submitting txn because it will fail on mainnet. This is just an example of how to construct a transfer restriction status update txn.')
         print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Update restriction status call failed: {e}")
 
     print("\n---- Create Market Sell (construction of txn only) ----")
     try:
+        print('Constructing txn...')
         market_sell_response = client.create_limit_order_with_fee(
             transactor_public_key=string_pubkey,
             quote_currency_public_key=DESO_TOKEN_PUBKEY,
@@ -1008,13 +1183,16 @@ def main():
             fill_type="IMMEDIATE_OR_CANCEL",
             quantity_currency_type="base",
         )
-        pprint(market_sell_response)
+        print('Txn constructed. The txn construction response often has useful information in it. Comment it in if you want to see it.')
+        # pprint(market_sell_response)
+        print('Not submitting txn because it will fail on mainnet. This is just an example of how to construct a market sell txn.')
         print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Market sell call failed: {e}")
 
     print("\n---- Create Limit Buy (construction of txn only) ----")
     try:
+        print('Constructing txn...')
         limit_buy_response = client.create_limit_order_with_fee(
             transactor_public_key=string_pubkey,
             quote_currency_public_key=DESO_TOKEN_PUBKEY,
@@ -1026,13 +1204,16 @@ def main():
             quantity_currency_type="quote",
             fill_type="GOOD_TILL_CANCELLED",
         )
-        pprint(limit_buy_response)
+        print('Txn constructed. The txn construction response often has useful information in it. Comment it in if you want to see it.')
+        # pprint(limit_buy_response)
+        print('Not submitting txn because it will fail on mainnet. This is just an example of how to construct a limit buy txn.')
         print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Limit buy call failed: {e}")
 
     print("\n---- Create Limit Sell (construction of txn only) ----")
     try:
+        print('Constructing txn...')
         limit_sell_response = client.create_limit_order_with_fee(
             transactor_public_key=string_pubkey,
             quote_currency_public_key=DESO_TOKEN_PUBKEY,
@@ -1044,51 +1225,63 @@ def main():
             quantity_currency_type="quote",
             fill_type="GOOD_TILL_CANCELLED",
         )
-        pprint(limit_sell_response)
+        print('Txn constructed. The txn construction response often has useful information in it. Comment it in if you want to see it.')
+        # pprint(limit_sell_response)
+        print('Not submitting txn because it will fail on mainnet. This is just an example of how to construct a limit sell txn.')
         print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Limit sell call failed: {e}")
 
     print("\n---- Cancel an Order (construction of txn only) ----")
     try:
+        print('Constructing txn...')
+        cancel_order_id = "b3996cee436b5ddcea11b65047ddc26c5fdb6b34a947fd1d3a43c4212045b3ef" if IS_TESTNET else "c63f0b6968d9adc8a4e5cf7bacc3fb6e2662332a7cbff21e554c1f6b9bea5341"
+        transactor_pubkey = "tBCKWkMW7SNyA4kuAHLtvFgdPRDgqS3gPfH5UWoeGZbxftkzUqpiKF" if IS_TESTNET else "BC1YLin7aTLTYMpSZme5oBnWMn74esHcwGcXpoqE2mRoVBW5oGHuzMU"
         cancel_response = client.cancel_limit_order(
-            transactor_public_key="tBCKWkMW7SNyA4kuAHLtvFgdPRDgqS3gPfH5UWoeGZbxftkzUqpiKF",
-            cancel_order_id="b3996cee436b5ddcea11b65047ddc26c5fdb6b34a947fd1d3a43c4212045b3ef",  # Example
+            transactor_public_key=transactor_pubkey,
+            cancel_order_id=cancel_order_id,  # Example
         )
-        pprint(cancel_response)
+        print('Txn constructed. The txn construction response often has useful information in it. Comment it in if you want to see it.')
+        # pprint(cancel_response)
         print('SUCCESS!')
     except Exception as e:
-        print(f"ERROR: Cancel order call failed; this will fail on mainnet but not testnet: {e}")
+        print(f"ERROR: Cancel order call failed; this is EXPECTED to fail on mainnet but not testnet: {e}")
 
     print("\n---- Get Open Orders for Market ($openfund vs DESO) ----")
     try:
+        print('Fetching open orders for $openfund vs DESO...')
         # Example: fetch the market for DESO and $openfund
         market_orders_response_1 = client.get_limit_orders(
             coin1_creator_pubkey=DESO_TOKEN_PUBKEY,
             coin2_creator_pubkey=openfund_pubkey,
         )
-        pprint(market_orders_response_1)
+        print('Skipping printing of response because too verbose. Uncomment the line below if you want to see it.')
+        # pprint(market_orders_response_1)
         print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Get open orders call 1 failed: {e}")
 
     print("\n---- Get Open Orders for Market ($openfund vs DESO, reversed) ----")
     try:
+        print('Fetching open orders for $openfund vs DESO...')
         market_orders_response_2 = client.get_limit_orders(
             coin1_creator_pubkey=openfund_pubkey,
             coin2_creator_pubkey=DESO_TOKEN_PUBKEY,
         )
-        pprint(market_orders_response_2)
+        print('Skipping printing of response because too verbose. Uncomment the line below if you want to see it.')
+        # pprint(market_orders_response_2)
         print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Get open orders call 2 failed: {e}")
 
     print("\n---- Get Open Orders for Transactor ----")
     try:
+        print('Fetching open orders for transactor...')
         user_orders_response = client.get_transactor_limit_orders(
             transactor_pubkey_base58check=nader_pubkey
         )
-        pprint(user_orders_response)
+        print('Skipping printing of response because too verbose. Uncomment the line below if you want to see it.')
+        # pprint(user_orders_response)
         print('SUCCESS!')
     except Exception as e:
         print(f"ERROR: Get user open orders call failed: {e}")

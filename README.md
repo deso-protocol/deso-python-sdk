@@ -104,21 +104,21 @@ If you get stuck or need help, you can always message the [DeSo PoS Discussion T
 
 Other useful links:
 - Block explorer:
-    - Testnet: explorer-testnet.deso.com
-    - Mainnet: explorer.deso.com
+   - Testnet: [explorer-testnet.deso.com](https://explorer-testnet.deso.com)
+   - Mainnet: [explorer.deso.com](https://explorer.deso.com)
 - Reference nodes:
-    - Testnet: test.deso.org
-    - Mainnet: node.deso.org
+   - Testnet: [test.deso.org](https://test.deso.org)
+   - Mainnet: [node.deso.org](https://node.deso.org)
 - Openfund:
-    - Testnet: dev.openfund.com
-    - Mainnet: beta.focus.xyz
+   - Testnet: [dev.openfund.com](https://dev.openfund.com)
+   - Mainnet: [beta.focus.xyz](https://beta.focus.xyz)
 - Focus:
-    - Testnet: beta.focus.xyz
-    - Mainnet: focus.xyz
+   - Testnet: [beta.focus.xyz](https://beta.focus.xyz)
+   - Mainnet: [focus.xyz](https://focus.xyz)
 - Docs:
-    - docs.deso.org
-    - deso.com
-    - [Running a DeSo Validator](https://docs.deso.org/deso-validators/run-a-validator)
-    - [Revolution Proof of Stake](https://revolution.deso.com)
-    - [DeSo Architecture Overview (old)](https://docs.deso.org/deso-repos/architecture-overview)
-    - [Algorithmic Trading Docs](TODO)
+   - [docs.deso.org](https://docs.deso.org)
+   - [deso.com](https://deso.com)
+   - [Running a DeSo Validator](https://docs.deso.org/deso-validators/run-a-validator)
+   - [Revolution Proof of Stake](https://revolution.deso.com)
+   - [DeSo Architecture Overview (old)](https://docs.deso.org/deso-repos/architecture-overview)
+   - [Algorithmic Trading Docs](TODO)

@@ -1045,7 +1045,7 @@ def main():
         print(f'DESO balance: {deso_balance_nanos} nanos (1e9 = 1 coin) = {client.base_units_to_coins(deso_balance_nanos, is_deso=True)} coins')
         print(f'OPENFUND balance: {openfund_balance_base_units} base units (1e18 = 1 token) = {client.base_units_to_coins(openfund_balance_base_units, is_deso=False)} tokens')
         your_token_balance_base_units = int(balances['Balances'][string_pubkey]['BalanceBaseUnits'])
-        print(f'${single_profile['Username']} balance: {your_token_balance_base_units} base units (1e18 = 1 token) = {client.base_units_to_coins(your_token_balance_base_units, is_deso=False)} tokens')
+        print(f'${single_profile["Username"]} balance: {your_token_balance_base_units} base units (1e18 = 1 token) = {client.base_units_to_coins(your_token_balance_base_units, is_deso=False)} tokens')
 
     print("\n---- Transfer DESO ----")
     try:

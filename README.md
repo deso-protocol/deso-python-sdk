@@ -8,11 +8,24 @@ The sdk works by first CONSTRUCTING a transaction, then SIGNING, then
 SUBMITTING the transaction to the DeSo blockchain (via node.deso.org
 or test.deso.org by default, though you can select your own nodes if you prefer).
 
-To get started, simply run the file and follow its instructions:
+To get started, simply run the file and follow its instructions.
+
+On Posix systems:
 ```
 python3 -m venv myenv
 
 source myenv/bin/activate
+
+pip install -r requirements.txt
+
+python3 deso_sdk.py
+```
+
+For Windows systems:
+```
+python3 -m venv myenv
+
+myenv\Scripts\activate
 
 pip install -r requirements.txt
 
